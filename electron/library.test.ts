@@ -19,7 +19,8 @@ async function image(filePath: string, color: string = '#1449dd'): Promise<void>
 const checksum = async (file: string) => createHash('sha256').update(await fs.readFile(file)).digest('hex');
 
 beforeEach(async () => {
-  temporaryRoot = await fs.mkdtemp(path.join(os.tmpdir(), 'sprintselect-library-'));
+  // Windows temp paths can contain RUNNER~1; compare canonical paths throughout.
+  temporaryRoot = await fs.realpath(await fs.mkdtemp(path.join(os.tmpdir(), 'sprintselect-library-')));
   source = path.join(temporaryRoot, 'event');
   data = path.join(temporaryRoot, 'user-data');
   await fs.mkdir(source);
@@ -77,9 +78,13 @@ describe('LibraryService integration with real images', () => {
     const restarted = new LibraryService(data);
     expect((await restarted.getAlbum())!.photos[0]).toMatchObject({ decision: 'keep', rating: 5, bibNumbers: ['128'], athleteTags: ['李明'] });
     expect((await restarted.importFolder(source)).photos).toHaveLength(1);
+    const originalBeforeChange = await checksum(file);
+    const previewBeforeChange = await checksum(restarted.getImagePath(id, 'preview')!);
     await image(file, '#dfee00');
+    expect(await checksum(file)).not.toBe(originalBeforeChange);
     const reimported = await restarted.importFolder(source);
     expect(reimported.photos[0]).toMatchObject({ id, decision: 'keep', rating: 5, athleteTags: ['李明'] });
+    expect(await checksum(restarted.getImagePath(id, 'preview')!)).not.toBe(previewBeforeChange);
     const files = await fs.readdir(data);
     expect(files.filter(file => file.endsWith('.tmp'))).toHaveLength(0);
     await expect(restarted.updatePhotos([id], { rating: 6 })).rejects.toThrow();

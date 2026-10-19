@@ -233,8 +233,12 @@ export class LibraryService {
         ocrStatus: previous?.ocrStatus ?? 'pending', ocrError: previous?.ocrError,
       };
     }
-    const metadata = await sharp(filePath, { limitInputPixels: 150_000_000 }).metadata();
-    const { data: preview, info } = await sharp(filePath, { limitInputPixels: 150_000_000 }).rotate()
+    // libvips can retain/memory-map filename inputs on Windows after processing.
+    // fs.readFile closes the original handle before native decoding starts; only
+    // the three active workers retain compressed inputs, never the whole album.
+    const input = await fs.readFile(filePath);
+    const metadata = await sharp(input, { limitInputPixels: 150_000_000 }).metadata();
+    const { data: preview, info } = await sharp(input, { limitInputPixels: 150_000_000 }).rotate()
       .resize({ width: 1800, height: 1800, fit: 'inside', withoutEnlargement: true })
       .jpeg({ quality: 85 }).toBuffer({ resolveWithObject: true });
     const [hash, sharpness, thumbnail] = await Promise.all([
@@ -245,7 +249,7 @@ export class LibraryService {
     let capturedAt = fileTime;
     let timeSource: Photo['timeSource'] = 'file';
     try {
-      const exif = await exifr.parse(filePath, { pick: ['DateTimeOriginal', 'CreateDate'] });
+      const exif = await exifr.parse(input, { pick: ['DateTimeOriginal', 'CreateDate'] });
       const date = exif?.DateTimeOriginal ?? exif?.CreateDate;
       if (date instanceof Date && Number.isFinite(date.getTime())) { capturedAt = date.toISOString(); timeSource = 'exif'; }
     } catch { /* Images without EXIF remain usable. */ }

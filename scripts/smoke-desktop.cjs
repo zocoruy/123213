@@ -8,7 +8,7 @@ const { createHash } = require('node:crypto');
 const sharp = require('sharp');
 
 (async () => {
-  const root = await fs.mkdtemp(path.join(os.tmpdir(), 'sprintselect-desktop-'));
+  const root = await fs.realpath(await fs.mkdtemp(path.join(os.tmpdir(), 'sprintselect-desktop-')));
   const source = path.join(root, '赛事照片');
   const destination = path.join(root, '导出');
   const userData = path.join(root, 'user-data');

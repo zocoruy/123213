@@ -1,4 +1,5 @@
 import { existsSync } from 'node:fs';
+import { readFile } from 'node:fs/promises';
 import path from 'node:path';
 import sharp from 'sharp';
 import { createWorker, OEM, PSM, type Worker } from 'tesseract.js';
@@ -150,7 +151,11 @@ export async function recognizeBibs(
       try {
         // Auto-orient before cropping; camera EXIF rotation otherwise moves the
         // bib outside the crop. Decode only one source photo at a time.
-        const image = await sharp(photo.path, { failOn: 'error', limitInputPixels: 120_000_000 })
+        // Node closes the original file before native decoding; libvips cannot
+        // retain a Windows file mapping that blocks external rename/overwrite.
+        const source = await readFile(photo.path);
+        if (signal?.aborted) break;
+        const image = await sharp(source, { failOn: 'error', limitInputPixels: 120_000_000 })
           .rotate()
           .resize({ width: 2400, height: 2400, fit: 'inside', withoutEnlargement: true })
           .flatten({ background: '#ffffff' })

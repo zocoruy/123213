@@ -1,4 +1,4 @@
-import { mkdtemp, rm, writeFile } from 'node:fs/promises';
+import { mkdtemp, rename, rm, writeFile } from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
 import sharp from 'sharp';
@@ -77,6 +77,9 @@ describe('local offline OCR', () => {
     expect(progress.filter((value) => value?.current === 3)).toHaveLength(1);
     expect(progress.at(-1)).toBeNull();
     expect(input.every((item) => item.bibNumbers[0] === 'manual-keep' && item.ocrStatus === 'pending')).toBe(true);
+    // Native image caches must not keep original photos locked on Windows.
+    await rename(first, `${first}.moved`);
+    await rename(`${first}.moved`, first);
   }, 90_000);
 
   it('cancels between photos and leaves unprocessed photos untouched', async () => {
